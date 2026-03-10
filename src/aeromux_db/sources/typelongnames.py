@@ -66,7 +66,8 @@ def parse_aircraft(extract_dir: Path) -> list[TypeLongnameData]:
                 aircraft.append(
                     TypeLongnameData(
                         aircraft_icao_address=icao.upper(),
-                        aircraft_registration=_to_str(row[1]),
+                        # Registrations containing only '?' characters are placeholders, not real values
+                        aircraft_registration=reg if (reg := _to_str(row[1])) is None or reg.strip("?") else None,
                         aircraft_type_code=_to_str(row[2]),
                         type_description=_to_str(row[4]),
                     )

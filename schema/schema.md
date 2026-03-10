@@ -110,13 +110,12 @@ Consolidated view of all aircraft information. Joins `aircrafts`, `types`, `manu
 | `aircraft_manufacturer_icao` | `aircrafts` | ICAO manufacturer code. |
 | `manufacturer_name` | `manufacturers` / `aircraft_fallbackdata` | Manufacturer name. Uses `manufacturers` table if reference exists, otherwise falls back to plain text from `aircraft_fallbackdata`. |
 | `aircraft_operator_icao` | `aircrafts` | ICAO operator code. |
-| `operator_name` | `operators` / `aircraft_fallbackdata` | Operator name. Uses `operators` table if reference exists, otherwise falls back to plain text from `aircraft_fallbackdata`. |
+| `operator_name` | `operators` / `aircraft_fallbackdata` / `aircraft_details` | Operator name. Uses `operators` table if reference exists, then falls back to plain text from `aircraft_fallbackdata`, then to `owner_operator` from `aircraft_details`. |
 | `operator_iata` | `operators` | IATA operator code. |
 | `operator_country` | `operators` | Country of the operator. |
 | `operator_callsign` | `operators` | Radio callsign. |
 | `year` | `aircraft_details` | Year of manufacture. |
 | `model` | `aircraft_details` | Full aircraft model name. |
-| `owner_operator` | `aircraft_details` | Owner or operator name. |
 | `faa_pia` | `aircraft_details` | FAA Privacy ICAO Address flag. |
 | `faa_ladd` | `aircraft_details` | FAA Limiting Aircraft Data Displayed flag. |
 | `military` | `aircraft_details` | Military aircraft flag. |

@@ -81,6 +81,7 @@ jobs:
           | Aircraft details | ${{ steps.build.outputs.adsbx_details_count }} |
           | Aircraft fallback | ${{ steps.build.outputs.adsbx_fallback_count }} |
           | OpenSky enriched | ${{ steps.build.outputs.opensky_enrichment_count }} |
+          | Plane Alert DB | ${{ steps.build.outputs.planealertdb_aircraft_count }} |
           | Type-longnames | ${{ steps.build.outputs.typelongnames_aircraft_count }} |
 
           ## Programmatic Access

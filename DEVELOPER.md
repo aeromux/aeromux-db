@@ -6,7 +6,7 @@ For quick start and usage instructions, see [README.md](README.md). For coding s
 
 ## Pipeline Architecture
 
-The builder follows a sequential pipeline that processes four data sources in a fixed order:
+The builder follows a sequential pipeline that processes five data sources in a fixed order:
 
 ```
 Download → Extract → Parse → Merge → Build
@@ -17,7 +17,8 @@ Download → Extract → Parse → Merge → Build
 1. **Mictronics** — base aircraft, type, and operator records.
 2. **ADS-B Exchange** — extended aircraft details, fill missing registrations.
 3. **OpenSky Network** — manufacturer records, operator IATA codes, aircraft enrichment.
-4. **Type-longnames** — per-aircraft model descriptions (highest quality).
+4. **Plane Alert DB** — operator/model overwrite, military flag, new aircraft.
+5. **Type-longnames** — per-aircraft model descriptions (highest quality).
 
 Each source is downloaded, extracted, and parsed into in-memory data structures, then merged into the database. The order matters — later sources enrich and overwrite data from earlier sources according to the merge rules described below.
 
@@ -111,7 +112,25 @@ Each value is an array: `[operator_name, operator_country, operator_callsign]`.
 
 **Populates:** `manufacturers`, `operators` (IATA codes only), `aircrafts` (enrichment of existing records), `aircraft_details` (model, owner), `aircraft_fallbackdata` (manufacturer, operator names).
 
-### 4. Type-Longnames (wiedehopf/chrisglobe)
+### 4. Plane Alert DB
+
+- **URL:** `https://raw.githubusercontent.com/sdr-enthusiasts/plane-alert-db/main/plane-alert-db.csv`
+- **Format:** CSV file downloaded directly (no archive). Updated frequently.
+
+**Columns used:**
+
+| Column | Description |
+|---|---|
+| `$ICAO` | ICAO 24-bit address (hex string). |
+| `$Registration` | Aircraft registration number. |
+| `$Operator` | Operator name. |
+| `$Type` | Aircraft model description. |
+| `$ICAO Type` | ICAO type designator (e.g. `B77W`). |
+| `#CMPG` | Category — when `Mil`, the aircraft is flagged as military. |
+
+**Populates:** `aircrafts` (new records and type code fill), `aircraft_details` (model overwrite, military flag), `aircraft_fallbackdata` (operator overwrite).
+
+### 5. Type-Longnames (wiedehopf/chrisglobe)
 
 - **URL:** `https://github.com/wiedehopf/type-longnames-chrisglobe/archive/refs/heads/master.tar.gz`
 - **Format:** Tarball containing CSV files in `individual-types/`, one file per aircraft type code. Each CSV has no header and five columns:
@@ -170,7 +189,21 @@ The CSV is processed row by row. OpenSky does not insert new aircraft — it onl
 - If `manufacturerIcao` is not null: set `aircraft_manufacturer_icao` as a foreign key reference.
 - If `manufacturerIcao` is null and `manufacturerName` is not null: store `manufacturer` in `aircraft_fallbackdata`.
 
-### Type-longnames (source 4 — model overwrite)
+### Plane Alert DB (source 4 — operator/model overwrite)
+
+The CSV is processed row by row. Duplicate ICAO addresses are deduplicated during parsing (last occurrence wins).
+
+**Existing aircraft:** For each row where the ICAO address exists in the `aircrafts` table:
+
+- If `ICAO Type` is not empty: set `aircraft_type_code` if it is currently null.
+- If `Type` is not empty: **overwrite** `model` in `aircraft_details` (creates the row if it does not exist).
+- If `Operator` is not empty: **overwrite** `operator` in `aircraft_fallbackdata` (creates the row if it does not exist).
+- If `CMPG` is `Mil`: set `military = 1` in `aircraft_details` (never unsets; creates the row if it does not exist).
+- If `Registration` is not null and `aircraft_registration` is currently null: set it. If both are non-null and differ: the mismatch is recorded for later conflict resolution.
+
+**New aircraft:** If the ICAO address does not exist, a new row is inserted into `aircrafts` (ICAO address, registration, type code). If the record has a model or military flag, `aircraft_details` is created. If the record has an operator, `aircraft_fallbackdata` is created.
+
+### Type-longnames (source 5 — model overwrite)
 
 All CSV files are parsed. For each record:
 
@@ -186,13 +219,13 @@ After all four sources are processed, registration conflicts are resolved. A con
 
 **Priority rules (applied in order — first match wins):**
 
-1. **Majority agreement** — If two or more sources agree on the registration, that value is used.
+1. **Majority agreement** — If two or more sources agree on the registration, that value is used. When multiple values each have 2+ agreeing sources (a tie), the group backed by the highest-priority source wins.
 2. **US FAA N-number** — If the registration matches the pattern `N` + 1–5 digits + 0–2 letters and only one candidate matches, that value is used.
 3. **IATA-style pattern** — If the registration matches `XX-YY` (1–4 alphanumeric characters on each side of a dash) and only one candidate matches, that value is used.
 4. **Contains dash** — If only one candidate contains a dash, that value is used.
-5. **Source priority** — Type-longnames > OpenSky > ADS-B Exchange > Mictronics. The highest-priority source with a non-null registration wins.
+5. **Source priority** — Type-longnames > Plane Alert DB > OpenSky > ADS-B Exchange > Mictronics. The highest-priority source with a non-null registration wins.
 
-The resolved registration is written back to the `aircrafts` table. All mismatches and their resolutions are written to `artifacts/reg_conflicts_resolutions.csv` with columns: `icao_address`, `mictronics_reg`, `adsbx_reg`, `opensky_reg`, `typelongnames_reg`, `selected_source`, `reason`.
+The resolved registration is written back to the `aircrafts` table. All mismatches and their resolutions are written to `artifacts/reg_conflicts_resolutions.csv` with columns: `icao_address`, `mictronics_reg`, `adsbx_reg`, `opensky_reg`, `planealertdb_reg`, `typelongnames_reg`, `selected_source`, `reason`.
 
 ## Database Properties
 

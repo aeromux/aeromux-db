@@ -109,7 +109,8 @@ def parse_aircraft(data_dir: Path) -> list[Aircraft]:
             Aircraft(
                 # Normalize to uppercase — source data uses mixed-case ICAO addresses
                 aircraft_icao_address=icao_address.upper(),
-                aircraft_registration=_sanitize(values[0]) if len(values) > 0 and values[0] else None,
+                # Registrations containing only '?' characters are placeholders, not real values
+                aircraft_registration=reg if (reg := _sanitize(values[0]) if len(values) > 0 and values[0] else None) is None or reg.strip("?") else None,
                 aircraft_type_code=_sanitize(values[1]) if len(values) > 1 and values[1] else None,
             )
         )

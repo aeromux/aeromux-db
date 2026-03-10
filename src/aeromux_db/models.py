@@ -104,3 +104,15 @@ class OpenSkyAircraftData:
     operator_icao: str | None = None
     operator: str | None = None
     owner: str | None = None
+
+
+@dataclass
+class PlaneAlertData:
+    """Aircraft data from Plane Alert DB."""
+
+    aircraft_icao_address: str
+    aircraft_registration: str | None = None
+    operator: str | None = None
+    model: str | None = None
+    aircraft_type_code: str | None = None
+    military: bool = False

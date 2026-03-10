@@ -150,7 +150,8 @@ def parse_aircraft_enrichment(file_path: Path) -> list[OpenSkyAircraftData]:
             enrichment.append(
                 OpenSkyAircraftData(
                     icao24=icao24.upper(),
-                    registration=_to_str(row.get("registration")),
+                    # Registrations containing only '?' characters are placeholders, not real values
+                    registration=reg if (reg := _to_str(row.get("registration"))) is None or reg.strip("?") else None,
                     country=_to_str(row.get("country")),
                     serial_number=_to_str(row.get("serialNumber")),
                     model=model,

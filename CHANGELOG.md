@@ -4,6 +4,23 @@ All notable changes to Aeromux Database Builder are documented in this file.
 
 This changelog covers the **builder tool** itself, not the generated database. Each weekly database release has its own record counts and details on the [Releases](https://github.com/nandortoth/aeromux-db/releases) page.
 
+## [1.1.0] — 2026-03-10
+
+### Added
+
+- New data source: [Plane Alert DB](https://github.com/sdr-enthusiasts/plane-alert-db) — community-maintained database of notable aircraft (military, government, VIP). Provides operator names, model descriptions, and military flags.
+- Pipeline expanded from 11 to 13 steps to accommodate the new source.
+- Registration conflict resolution now covers five sources with updated priority rules.
+
+### Changed
+
+- `operator_name` in `aircraft_view` now resolves through three fallback tiers: `operators` table, `aircraft_fallbackdata`, then `owner_operator` from `aircraft_details`. The `owner_operator` column is no longer exposed as a separate view column.
+
+### Fixed
+
+- Filter out placeholder registrations containing only `?` characters across all five data source parsers.
+- Fix majority rule tie-breaking in registration conflict resolution — when multiple values each have 2+ agreeing sources, the group backed by the highest-priority source now wins.
+
 ## [1.0.1] — 2026-03-08
 
 ### Added

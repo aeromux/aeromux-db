@@ -59,7 +59,8 @@ def parse_aircraft(file_path: Path) -> list[Aircraft]:
             aircraft.append(
                 Aircraft(
                     aircraft_icao_address=record["icao"].upper(),
-                    aircraft_registration=_sanitize(record.get("reg")),
+                    # Registrations containing only '?' characters are placeholders, not real values
+                    aircraft_registration=reg if (reg := _sanitize(record.get("reg"))) is None or reg.strip("?") else None,
                     aircraft_type_code=_sanitize(record.get("icaotype")),
                 )
             )

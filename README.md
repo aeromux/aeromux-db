@@ -9,7 +9,7 @@ Aeromux Database Builder generates a SQLite database from external aircraft data
 
 ## Features
 
-- **Multiple Data Sources** — Aggregates aircraft data from four external sources (Mictronics, ADS-B Exchange, OpenSky Network, type-longnames) into a single, unified SQLite database.
+- **Multiple Data Sources** — Aggregates aircraft data from five external sources (Mictronics, ADS-B Exchange, OpenSky Network, Plane Alert DB, type-longnames) into a single, unified SQLite database.
 
 - **Fast Local Lookups** — Provides Aeromux with aircraft metadata keyed by ICAO 24-bit address for instant enrichment of decoded messages.
 
@@ -96,6 +96,7 @@ The full SQL schema is defined in [`schema/schema.sql`](schema/schema.sql) and d
 | [Mictronics Aircraft Database](https://www.mictronics.de/aircraft-database/) | Aircraft registrations, type designators, and operator information. Distributed as a ZIP archive containing JSON files. |
 | [ADS-B Exchange Aircraft Database](https://www.adsbexchange.com/products/historical-data/) | Aircraft registrations with extended details (year, manufacturer, model, owner/operator, FAA flags, military flag). Distributed as a gzip-compressed JSON file, updated daily. |
 | [OpenSky Network Aircraft Database](https://opensky-network.org/datasets/metadata/) | Manufacturer records, operator IATA codes, and aircraft enrichment data (country, serial number, owner). Distributed as a monthly CSV file. |
+| [Plane Alert DB](https://github.com/sdr-enthusiasts/plane-alert-db) | Community-maintained database of notable aircraft (military, government, VIP) with operator names, model descriptions, and military flags. Distributed as a CSV file, updated frequently. |
 | [Type-Longnames (wiedehopf/chrisglobe)](https://github.com/wiedehopf/type-longnames-chrisglobe) | Per-aircraft type descriptions (e.g. `Boeing C-40A Clipper`). Distributed as a tarball of CSV files, one per type code. |
 
 The tool downloads each data source, extracts and parses the data, and inserts the records into the database. Downloaded files are stored in a temporary directory that is automatically cleaned up after the build.
@@ -122,6 +123,7 @@ aeromux-db/
 │           ├── mictronics.py      # Mictronics data source parser
 │           ├── adsbexchange.py    # ADS-B Exchange data source parser
 │           ├── opensky.py         # OpenSky Network data source parser
+│           ├── planealertdb.py    # Plane Alert DB data source parser
 │           └── typelongnames.py   # Type-longnames data source parser
 ├── schema/
 │   ├── schema.sql         # Authoritative SQL schema (single source of truth)
@@ -165,6 +167,7 @@ This project would not be possible without the following data sources and their 
 - **[Mictronics Aircraft Database](https://www.mictronics.de/aircraft-database/)** — Comprehensive aircraft database providing registration, type, and operator data for hundreds of thousands of aircraft worldwide. Thank you for making this invaluable resource freely available to the aviation community.
 - **[ADS-B Exchange](https://www.adsbexchange.com/)** — Unfiltered flight tracking data and aircraft database, updated daily from government and various sources. Thank you for providing open access to aircraft data.
 - **[OpenSky Network](https://opensky-network.org/)** — Community-driven aircraft metadata including manufacturer records, operator IATA codes, and enrichment data. Thank you for maintaining this open dataset.
+- **[Plane Alert DB](https://github.com/sdr-enthusiasts/plane-alert-db)** — Community-maintained database of notable aircraft including military, government, and VIP planes. Thank you for curating and sharing this valuable resource with the aviation community.
 - **[Type-Longnames (wiedehopf/chrisglobe)](https://github.com/wiedehopf/type-longnames-chrisglobe)** — Per-aircraft type descriptions that provide specific model variants beyond generic type codes. Thank you for curating this detailed dataset.
 
 ## Contact

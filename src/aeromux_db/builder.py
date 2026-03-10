@@ -32,6 +32,7 @@ from aeromux_db.models import (
     Manufacturer,
     OpenSkyAircraftData,
     Operator,
+    PlaneAlertData,
     TypeLongnameData,
 )
 
@@ -56,9 +57,10 @@ _IATA_RE = re.compile(r"^[A-Z0-9]{1,4}-[A-Z0-9]{1,4}$")
 
 
 def _resolve_registration(
-    mic: str | None, adsbx: str | None, opensky: str | None, typelongnames: str | None = None,
+    mic: str | None, adsbx: str | None, opensky: str | None,
+    planealertdb: str | None = None, typelongnames: str | None = None,
 ) -> tuple[str, str, str]:
-    """Pick the winning registration from up to four sources.
+    """Pick the winning registration from up to five sources.
 
     Returns (value, source_name, reason).
     """
@@ -69,6 +71,8 @@ def _resolve_registration(
         candidates.append((adsbx, "adsbx"))
     if opensky:
         candidates.append((opensky, "opensky"))
+    if planealertdb:
+        candidates.append((planealertdb, "planealertdb"))
     if typelongnames:
         candidates.append((typelongnames, "typelongnames"))
 
@@ -76,17 +80,22 @@ def _resolve_registration(
         val, src = candidates[0] if candidates else ("", "none")
         return val, src, "only_value"
 
-    # Rule 1: majority (2+ agree)
+    # Rule 1: majority (2+ agree) — when multiple values tie, pick the group
+    # whose highest-priority source wins
     counts = Counter(v for v, _ in candidates)
     majority = [v for v, c in counts.items() if c >= 2]
     if majority:
-        winner_val = majority[0]
-        priority = {"typelongnames": 4, "adsbx": 3, "opensky": 2, "mictronics": 1}
+        priority = {"typelongnames": 5, "planealertdb": 4, "adsbx": 3, "opensky": 2, "mictronics": 1}
+        winner_val = max(
+            majority,
+            key=lambda v: max(priority[s] for val, s in candidates if val == v),
+        )
         winner_src = max(
             (s for v, s in candidates if v == winner_val),
             key=lambda s: priority[s],
         )
-        return winner_val, winner_src, "majority"
+        reason = "majority" if len(majority) == 1 else "majority_tiebreak"
+        return winner_val, winner_src, reason
 
     # Rule 2: FAA N-number (unique match only)
     faa = [(v, s) for v, s in candidates if _FAA_N_RE.match(v)]
@@ -103,8 +112,8 @@ def _resolve_registration(
     if len(dash) == 1:
         return dash[0][0], dash[0][1], "has_dash"
 
-    # Rule 5: default priority typelongnames > opensky > adsbx > mictronics
-    default = {"typelongnames": 4, "opensky": 3, "adsbx": 2, "mictronics": 1}
+    # Rule 5: default priority typelongnames > planealertdb > opensky > adsbx > mictronics
+    default = {"typelongnames": 5, "planealertdb": 4, "opensky": 3, "adsbx": 2, "mictronics": 1}
     winner = max(candidates, key=lambda c: default[c[1]])
     return winner[0], winner[1], "default_priority"
 
@@ -119,6 +128,7 @@ def build_database(
     manufacturers: list[Manufacturer] | None = None,
     opensky_operator_iata: dict[str, str] | None = None,
     opensky_aircraft: list[OpenSkyAircraftData] | None = None,
+    planealertdb_aircraft: list[PlaneAlertData] | None = None,
     typelongnames_aircraft: list[TypeLongnameData] | None = None,
     *,
     db_version: str,
@@ -145,6 +155,8 @@ def build_database(
         opensky_operator_iata: Mapping of operator ICAO to IATA codes
             from OpenSky Network.
         opensky_aircraft: Aircraft enrichment data from OpenSky Network.
+        planealertdb_aircraft: Aircraft data from Plane Alert DB with
+            operator, model, and military flag.
         typelongnames_aircraft: Per-aircraft type descriptions from
             type-longnames source.
         db_version: Calendar-based database version string
@@ -217,13 +229,18 @@ def build_database(
             a.icao24: a.registration
             for a in (opensky_aircraft or [])
         }
+        planealertdb_regs: dict[str, str | None] = {
+            a.aircraft_icao_address: a.aircraft_registration
+            for a in (planealertdb_aircraft or [])
+        }
         typelongnames_regs: dict[str, str | None] = {
             a.aircraft_icao_address: a.aircraft_registration
             for a in (typelongnames_aircraft or [])
         }
-        reg_mismatches: dict[str, tuple[str | None, str | None, str | None, str | None]] = {}
+        reg_mismatches: dict[str, tuple[str | None, str | None, str | None, str | None, str | None]] = {}
         adsbx_mismatch_count = 0
         opensky_mismatch_count = 0
+        planealertdb_mismatch_count = 0
         typelongnames_mismatch_count = 0
         if adsbx_aircraft:
             new_aircraft = []
@@ -231,7 +248,7 @@ def build_database(
                 if a.aircraft_icao_address in mictronics_regs:
                     existing_reg = mictronics_regs[a.aircraft_icao_address]
                     if a.aircraft_registration and existing_reg and a.aircraft_registration != existing_reg:
-                        reg_mismatches[a.aircraft_icao_address] = (existing_reg, a.aircraft_registration, None, None)
+                        reg_mismatches[a.aircraft_icao_address] = (existing_reg, a.aircraft_registration, None, None, None)
                         adsbx_mismatch_count += 1
                     elif a.aircraft_registration and not existing_reg:
                         conn.execute(
@@ -350,12 +367,13 @@ def build_database(
                         opensky_mismatch_count += 1
                         if oa.icao24 in reg_mismatches:
                             prev = reg_mismatches[oa.icao24]
-                            reg_mismatches[oa.icao24] = (prev[0], prev[1], oa.registration, prev[3])
+                            reg_mismatches[oa.icao24] = (prev[0], prev[1], oa.registration, prev[3], prev[4])
                         else:
                             reg_mismatches[oa.icao24] = (
                                 mictronics_regs.get(oa.icao24),
                                 adsbx_regs.get(oa.icao24),
                                 oa.registration,
+                                None,
                                 None,
                             )
                     else:
@@ -417,6 +435,117 @@ def build_database(
                 f"{opensky_mismatch_count:,}",
             )
 
+        # Merge Plane Alert DB
+        if planealertdb_aircraft:
+            existing_icaos_pa = set(
+                row[0] for row in conn.execute("SELECT aircraft_icao_address FROM aircrafts")
+            )
+
+            new_aircraft = []
+            for pa in planealertdb_aircraft:
+                if pa.aircraft_icao_address in existing_icaos_pa:
+                    # Type code: fill if null
+                    if pa.aircraft_type_code:
+                        conn.execute(
+                            "UPDATE aircrafts SET aircraft_type_code = ? "
+                            "WHERE aircraft_icao_address = ? AND aircraft_type_code IS NULL",
+                            (pa.aircraft_type_code, pa.aircraft_icao_address),
+                        )
+
+                    # Model: overwrite — Plane Alert DB is higher quality than ADS-B Exchange/OpenSky
+                    if pa.model:
+                        conn.execute(
+                            "INSERT OR IGNORE INTO aircraft_details (aircraft_icao_address) VALUES (?)",
+                            (pa.aircraft_icao_address,),
+                        )
+                        conn.execute(
+                            "UPDATE aircraft_details SET model = ? WHERE aircraft_icao_address = ?",
+                            (pa.model, pa.aircraft_icao_address),
+                        )
+
+                    # Operator: overwrite in fallback — Plane Alert DB names take precedence
+                    if pa.operator:
+                        conn.execute(
+                            "INSERT INTO aircraft_fallbackdata (aircraft_icao_address, operator) "
+                            "VALUES (?, ?) "
+                            "ON CONFLICT(aircraft_icao_address) DO UPDATE SET operator = ?",
+                            (pa.aircraft_icao_address, pa.operator, pa.operator),
+                        )
+
+                    # Military: set (never unset), create details row if needed
+                    if pa.military:
+                        conn.execute(
+                            "INSERT OR IGNORE INTO aircraft_details (aircraft_icao_address) VALUES (?)",
+                            (pa.aircraft_icao_address,),
+                        )
+                        conn.execute(
+                            "UPDATE aircraft_details SET military = 1 WHERE aircraft_icao_address = ?",
+                            (pa.aircraft_icao_address,),
+                        )
+
+                    # Registration: fill if null, record mismatch if differs
+                    if pa.aircraft_registration:
+                        existing_reg_row = conn.execute(
+                            "SELECT aircraft_registration FROM aircrafts WHERE aircraft_icao_address = ?",
+                            (pa.aircraft_icao_address,),
+                        ).fetchone()
+                        existing_reg = existing_reg_row[0] if existing_reg_row else None
+                        if existing_reg and pa.aircraft_registration != existing_reg:
+                            planealertdb_mismatch_count += 1
+                            if pa.aircraft_icao_address in reg_mismatches:
+                                prev = reg_mismatches[pa.aircraft_icao_address]
+                                reg_mismatches[pa.aircraft_icao_address] = (
+                                    prev[0], prev[1], prev[2], pa.aircraft_registration, prev[4],
+                                )
+                            else:
+                                reg_mismatches[pa.aircraft_icao_address] = (
+                                    mictronics_regs.get(pa.aircraft_icao_address),
+                                    adsbx_regs.get(pa.aircraft_icao_address),
+                                    opensky_regs.get(pa.aircraft_icao_address),
+                                    pa.aircraft_registration,
+                                    None,
+                                )
+                        elif not existing_reg:
+                            conn.execute(
+                                "UPDATE aircrafts SET aircraft_registration = ? "
+                                "WHERE aircraft_icao_address = ? AND aircraft_registration IS NULL",
+                                (pa.aircraft_registration, pa.aircraft_icao_address),
+                            )
+                else:
+                    new_aircraft.append(pa)
+
+            if new_aircraft:
+                logger.debug("Inserting %d new aircraft from Plane Alert DB", len(new_aircraft))
+                conn.executemany(
+                    "INSERT INTO aircrafts (aircraft_icao_address, aircraft_registration, aircraft_type_code) "
+                    "VALUES (?, ?, ?)",
+                    [
+                        (pa.aircraft_icao_address, pa.aircraft_registration, pa.aircraft_type_code)
+                        for pa in new_aircraft
+                    ],
+                )
+                for pa in new_aircraft:
+                    if pa.model or pa.military:
+                        conn.execute(
+                            "INSERT OR IGNORE INTO aircraft_details "
+                            "(aircraft_icao_address, model, military) VALUES (?, ?, ?)",
+                            (pa.aircraft_icao_address, pa.model, int(pa.military)),
+                        )
+                    if pa.operator:
+                        conn.execute(
+                            "INSERT OR IGNORE INTO aircraft_fallbackdata "
+                            "(aircraft_icao_address, operator) VALUES (?, ?)",
+                            (pa.aircraft_icao_address, pa.operator),
+                        )
+
+            total_aircraft += len(new_aircraft)
+
+            logger.info(
+                "  Plane Alert DB merge: %s new aircraft, %s registration mismatches",
+                f"{len(new_aircraft):,}",
+                f"{planealertdb_mismatch_count:,}",
+            )
+
         # Merge type-longnames aircraft
         if typelongnames_aircraft:
             existing_icaos = set(
@@ -458,12 +587,13 @@ def build_database(
                             typelongnames_mismatch_count += 1
                             if a.aircraft_icao_address in reg_mismatches:
                                 prev = reg_mismatches[a.aircraft_icao_address]
-                                reg_mismatches[a.aircraft_icao_address] = (prev[0], prev[1], prev[2], a.aircraft_registration)
+                                reg_mismatches[a.aircraft_icao_address] = (prev[0], prev[1], prev[2], prev[3], a.aircraft_registration)
                             else:
                                 reg_mismatches[a.aircraft_icao_address] = (
                                     mictronics_regs.get(a.aircraft_icao_address),
                                     adsbx_regs.get(a.aircraft_icao_address),
                                     opensky_regs.get(a.aircraft_icao_address),
+                                    planealertdb_regs.get(a.aircraft_icao_address),
                                     a.aircraft_registration,
                                 )
                         elif a.aircraft_registration and not existing_reg:
@@ -505,10 +635,10 @@ def build_database(
 
         # Resolve registration mismatches and update the database
         if reg_mismatches:
-            resolved: dict[str, tuple[str | None, str | None, str | None, str | None, str, str]] = {}
-            for icao, (mic_reg, adsbx_r, osky_reg, tl_reg) in reg_mismatches.items():
-                winner_val, winner_src, reason = _resolve_registration(mic_reg, adsbx_r, osky_reg, tl_reg)
-                resolved[icao] = (mic_reg, adsbx_r, osky_reg, tl_reg, winner_src, reason)
+            resolved: dict[str, tuple[str | None, str | None, str | None, str | None, str | None, str, str]] = {}
+            for icao, (mic_reg, adsbx_r, osky_reg, pa_reg, tl_reg) in reg_mismatches.items():
+                winner_val, winner_src, reason = _resolve_registration(mic_reg, adsbx_r, osky_reg, pa_reg, tl_reg)
+                resolved[icao] = (mic_reg, adsbx_r, osky_reg, pa_reg, tl_reg, winner_src, reason)
                 conn.execute(
                     "UPDATE aircrafts SET aircraft_registration = ? WHERE aircraft_icao_address = ?",
                     (winner_val, icao),
@@ -517,12 +647,13 @@ def build_database(
             mismatch_path = ARTIFACTS_DIR / "reg_conflicts_resolutions.csv"
             with open(mismatch_path, "w", newline="") as f:
                 writer = csv.writer(f)
-                writer.writerow(["icao_address", "mictronics_reg", "adsbx_reg", "opensky_reg", "typelongnames_reg", "selected_source", "reason"])
-                for icao, (mic_reg, adsbx_reg, osky_reg, tl_reg, sel_src, reason) in resolved.items():
-                    writer.writerow([icao, mic_reg or "", adsbx_reg or "", osky_reg or "", tl_reg or "", sel_src, reason])
+                writer.writerow(["icao_address", "mictronics_reg", "adsbx_reg", "opensky_reg", "planealertdb_reg", "typelongnames_reg", "selected_source", "reason"])
+                for icao, (mic_reg, adsbx_reg, osky_reg, pa_reg, tl_reg, sel_src, reason) in resolved.items():
+                    writer.writerow([icao, mic_reg or "", adsbx_reg or "", osky_reg or "", pa_reg or "", tl_reg or "", sel_src, reason])
             logger.info("  Registration mismatches: %s total", f"{len(reg_mismatches):,}")
             logger.info("    ADS-B Exchange: %s", f"{adsbx_mismatch_count:,}")
             logger.info("    OpenSky: %s", f"{opensky_mismatch_count:,}")
+            logger.info("    Plane Alert DB: %s", f"{planealertdb_mismatch_count:,}")
             logger.info("    Type-longnames: %s", f"{typelongnames_mismatch_count:,}")
             logger.info(
                 "    Wrote to %s",
