@@ -2,7 +2,7 @@
 
 All notable changes to Aeromux Database Builder are documented in this file.
 
-This changelog covers the **builder tool** itself, not the generated database. Each weekly database release has its own record counts and details on the [Releases](https://github.com/nandortoth/aeromux-db/releases) page.
+This changelog covers the **builder tool** itself, not the generated database. Each weekly database release has its own record counts and details on the [Releases](https://github.com/aeromux/aeromux-db/releases) page.
 
 ## [1.1.0] — 2026-03-10
 

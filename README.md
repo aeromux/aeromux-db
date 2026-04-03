@@ -3,9 +3,9 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE.md)
 [![Python](https://img.shields.io/badge/Python-3.13+-3776ab)](https://www.python.org)
 
-**A database builder for the [Aeromux](https://github.com/nandortoth/aeromux) ADS-B decoder**
+**A database builder for the [Aeromux](https://github.com/aeromux/aeromux) ADS-B decoder**
 
-Aeromux Database Builder generates a SQLite database from external aircraft data sources. The resulting database is consumed by [Aeromux](https://github.com/nandortoth/aeromux) at runtime to enrich decoded Mode S messages with supplementary aircraft information such as registration numbers, operators, and aircraft types.
+Aeromux Database Builder generates a SQLite database from external aircraft data sources. The resulting database is consumed by [Aeromux](https://github.com/aeromux/aeromux) at runtime to enrich decoded Mode S messages with supplementary aircraft information such as registration numbers, operators, and aircraft types.
 
 ## Features
 
@@ -28,7 +28,7 @@ Aeromux Database Builder generates a SQLite database from external aircraft data
 
 ```bash
 # Clone the repository
-git clone https://github.com/nandortoth/aeromux-db.git
+git clone https://github.com/aeromux/aeromux-db.git
 cd aeromux-db
 
 # Build the database using the convenience script
@@ -140,10 +140,10 @@ To check the latest version or download the database programmatically:
 
 ```bash
 # Check latest version
-curl -s https://api.github.com/repos/nandortoth/aeromux-db/releases/latest | jq -r '.tag_name'
+curl -s https://api.github.com/repos/aeromux/aeromux-db/releases/latest | jq -r '.tag_name'
 
 # Download latest database
-curl -sL https://api.github.com/repos/nandortoth/aeromux-db/releases/latest \
+curl -sL https://api.github.com/repos/aeromux/aeromux-db/releases/latest \
   | jq -r '.assets[0].browser_download_url' \
   | xargs curl -sLO
 ```
@@ -174,4 +174,4 @@ This project would not be possible without the following data sources and their 
 
 - **Author:** Nandor Toth
 - **Email:** dev@nandortoth.com
-- **Issues:** [github.com/nandortoth/aeromux-db/issues](https://github.com/nandortoth/aeromux-db/issues)
+- **Issues:** [github.com/aeromux/aeromux-db/issues](https://github.com/aeromux/aeromux-db/issues)
