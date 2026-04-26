@@ -38,4 +38,9 @@ def parse_args() -> argparse.Namespace:
         default=1,
         help="Release number within the current week (default: 1).",
     )
+    parser.add_argument(
+        "--print-version",
+        action="store_true",
+        help="Print the resolved db_version to stdout and exit (no build).",
+    )
     return parser.parse_args()

@@ -4,6 +4,16 @@ All notable changes to Aeromux Database Builder are documented in this file.
 
 This changelog covers the **builder tool** itself, not the generated database. Each weekly database release has its own record counts and details on the [Releases](https://github.com/aeromux/aeromux-db/releases) page.
 
+## [1.2.0] — 2026-04-26
+
+### Added
+
+- `aeromux-db --print-version` flag prints the resolved calendar-based `db_version` to stdout and exits without performing a build.
+
+### Changed
+
+- Scheduled CI build now runs on both Saturday and Sunday at 03:15 UTC. Both runs of a weekend share the same ISO-week-based version; the second run resolves the target version up front and skips the ~15-minute download/build cycle if a release for that version already exists. This mitigates intermittent outbound TCP failures on GitHub-hosted runners ([`actions/runner-images#4700`](https://github.com/actions/runner-images/issues/4700)) by giving each weekend two independent runner draws.
+
 ## [1.1.0] — 2026-03-10
 
 ### Added

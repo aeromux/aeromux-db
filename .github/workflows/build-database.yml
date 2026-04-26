@@ -2,8 +2,10 @@ name: Build Database
 
 on:
   schedule:
-    # Every Sunday at 03:15 UTC (off-peak to reduce network timeout risk)
-    - cron: "15 3 * * 0"
+    # Two chances per weekend — independent runner draws mitigate
+    # actions/runner-images#4700 (bad-runner outbound TCP failures).
+    - cron: "15 3 * * 6"   # Saturday 03:15 UTC
+    - cron: "15 3 * * 0"   # Sunday 03:15 UTC
   workflow_dispatch:
     inputs:
       release:
@@ -25,15 +27,39 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v4
 
-      - name: Build database
-        id: build
+      - name: Compute release args
+        id: args
         run: |
-          EXTRA_ARGS=""
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.release }}" ]; then
-            EXTRA_ARGS="--release ${{ inputs.release }}"
+            echo "extra=--release ${{ inputs.release }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "extra=" >> "$GITHUB_OUTPUT"
           fi
 
-          uv run aeromux-db $EXTRA_ARGS > build_summary.txt
+      - name: Resolve target version
+        id: version
+        run: |
+          DB_VERSION=$(uv run aeromux-db --print-version ${{ steps.args.outputs.extra }})
+          echo "db_version=$DB_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Target version: $DB_VERSION"
+
+      - name: Check for existing release
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "${{ steps.version.outputs.db_version }}" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release ${{ steps.version.outputs.db_version }} already exists; skipping build."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build database
+        id: build
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          uv run aeromux-db ${{ steps.args.outputs.extra }} > build_summary.txt
 
           # Parse all summary values
           while IFS='=' read -r key value; do
@@ -43,18 +69,6 @@ jobs:
           # Add filename for the download URL
           OUTPUT_FILE=$(grep "^OUTPUT_FILE=" build_summary.txt | cut -d= -f2-)
           echo "filename=$(basename "$OUTPUT_FILE")" >> "$GITHUB_OUTPUT"
-
-      - name: Check for existing release
-        id: check
-        run: |
-          if gh release view "${{ steps.build.outputs.db_version }}" > /dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "Release ${{ steps.build.outputs.db_version }} already exists, skipping."
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create release
         if: steps.check.outputs.exists == 'false'

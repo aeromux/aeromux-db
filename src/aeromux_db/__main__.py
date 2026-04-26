@@ -121,6 +121,10 @@ def main() -> None:
 
     args = parse_args()
 
+    if args.print_version:
+        print(get_db_version(release=args.release))
+        return
+
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(
         level=log_level,

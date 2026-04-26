@@ -134,7 +134,7 @@ aeromux-db/
 
 ## Releases
 
-Each release of this repository represents a new version of the generated database. A [GitHub Actions workflow](.github/workflows/build-database.yml) builds the database automatically every Sunday and publishes it as a GitHub Release with the SQLite file attached. Only the 10 most recent releases are kept.
+Each release of this repository represents a new version of the generated database. A [GitHub Actions workflow](.github/workflows/build-database.yml) builds the database automatically every weekend (Saturday and Sunday at 03:15 UTC); the second run of the weekend skips early if the first already produced a release for the same ISO week. The database is published as a GitHub Release with the SQLite file attached. Only the 10 most recent releases are kept.
 
 To check the latest version or download the database programmatically:
 
