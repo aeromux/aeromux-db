@@ -130,6 +130,7 @@ def build_database(
     opensky_aircraft: list[OpenSkyAircraftData] | None = None,
     planealertdb_aircraft: list[PlaneAlertData] | None = None,
     typelongnames_aircraft: list[TypeLongnameData] | None = None,
+    wtc_map: dict[str, str] | None = None,
     *,
     db_version: str,
 ) -> BuildResult:
@@ -159,6 +160,8 @@ def build_database(
             operator, model, and military flag.
         typelongnames_aircraft: Per-aircraft type descriptions from
             type-longnames source.
+        wtc_map: Per-type ICAO Wake Turbulence Category letters from
+            tar1090-db, keyed by ICAO type designator.
         db_version: Calendar-based database version string
             (e.g. ``2026.1.w08_r1``).
 
@@ -183,10 +186,19 @@ def build_database(
         schema_sql = SCHEMA_PATH.read_text()
         conn.executescript(schema_sql)
 
+        # Enrich types with WTC from tar1090-db. Mictronics is the sole
+        # authority for type_code / type_description / type_icao_class;
+        # tar1090-db only adds the WTC letter to rows Mictronics already
+        # produced. Unmatched type codes stay NULL.
+        if wtc_map:
+            for t in types:
+                t.type_wtc = wtc_map.get(t.type_code)
+
         logger.debug("Inserting %d types", len(types))
         conn.executemany(
-            "INSERT INTO types (type_code, type_description, type_icao_class) VALUES (?, ?, ?)",
-            [(t.type_code, t.type_description, t.type_icao_class) for t in types],
+            "INSERT INTO types (type_code, type_description, type_icao_class, type_wtc) "
+            "VALUES (?, ?, ?, ?)",
+            [(t.type_code, t.type_description, t.type_icao_class, t.type_wtc) for t in types],
         )
 
         logger.debug("Inserting %d operators", len(operators))

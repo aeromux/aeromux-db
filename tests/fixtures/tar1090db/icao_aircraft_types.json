@@ -1,0 +1,9 @@
+{
+  "A388": {"desc": "L4J", "wtc": "J"},
+  "B748": {"desc": "L4J", "wtc": "H"},
+  "C172": {"desc": "L1P", "wtc": "L"},
+  "B738": {"desc": "L2J", "wtc": "M"},
+  "BADX": {"desc": "L2J", "wtc": "Q"},
+  "BADY": {"desc": "L2J", "wtc": ""},
+  "BADZ": {"desc": "L2J"}
+}

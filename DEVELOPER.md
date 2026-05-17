@@ -6,7 +6,7 @@ For quick start and usage instructions, see [README.md](README.md). For coding s
 
 ## Pipeline Architecture
 
-The builder follows a sequential pipeline that processes five data sources in a fixed order:
+The builder follows a sequential pipeline that processes six data sources in a fixed order:
 
 ```
 Download → Extract → Parse → Merge → Build
@@ -19,8 +19,11 @@ Download → Extract → Parse → Merge → Build
 3. **OpenSky Network** — manufacturer records, operator IATA codes, aircraft enrichment.
 4. **Plane Alert DB** — operator/model overwrite, military flag, new aircraft.
 5. **Type-longnames** — per-aircraft model descriptions (highest quality).
+6. **tar1090-db** — per-type WTC enrichment.
 
 Each source is downloaded, extracted, and parsed into in-memory data structures, then merged into the database. The order matters — later sources enrich and overwrite data from earlier sources according to the merge rules described below.
+
+The technical constraint on tar1090-db is only that it run **after Mictronics (source 1)** — the enrichment merges into the Mictronics-derived `types` list. Sources 2–5 all operate on `aircrafts` / `aircraft_details` / `aircraft_fallbackdata`, not `types`, so they neither depend on nor block the WTC enrichment. Slot 6 (appended at the end) is a presentation choice, not a constraint — it keeps the existing aircrafts-table enrichment chain (sources 1–5) visually contiguous, with the types-table enrichment as a clean tail step.
 
 ## Data Sources
 
@@ -147,6 +150,19 @@ The type descriptions are unique per aircraft, not per type code — the same ty
 
 **Populates:** `aircrafts` (new records and type code fill), `aircraft_details` (model overwrite).
 
+### 6. tar1090-db (wiedehopf)
+
+- **URL:** `https://github.com/wiedehopf/tar1090-db/archive/refs/heads/master.tar.gz`
+- **Format:** Tarball containing a single `icao_aircraft_types.json` file at the repo root. JSON shape is a flat object keyed by ICAO type designator:
+
+  ```json
+  {"A388": {"desc": "L4J", "wtc": "J"}, ...}
+  ```
+
+  Only the `wtc` field is consumed. The `desc` field overlaps semantically with Mictronics's `type_icao_class` and is intentionally ignored so Mictronics remains the single authority for that column.
+
+**Populates:** `types` (`type_wtc` column only).
+
 ## Data Merge Logic
 
 ### Mictronics (source 1 — base records)
@@ -212,6 +228,19 @@ All CSV files are parsed. For each record:
   - If `type_description` is not null: **overwrite** `model` in `aircraft_details` (this source is treated as highest quality). If no `aircraft_details` row exists, one is created.
   - If `registration` is not null and `aircraft_registration` is currently null: set it. If both are non-null and differ: the mismatch is recorded for later conflict resolution.
 - **ICAO address does not exist:** A new row is inserted into `aircrafts` (ICAO address, registration, type code) and `aircraft_details` (model).
+
+### tar1090-db (source 6 — type WTC enrichment)
+
+The parsed dict (type code → WTC letter) is merged into the in-memory `types` list before the SQL insert:
+
+```python
+for t in types:
+    t.type_wtc = wtc_map.get(t.type_code)
+```
+
+Mictronics-only type codes (no tar1090-db match) end up with `type_wtc = NULL` — no hard failure, just a coverage gap. tar1090-db-only type codes (no Mictronics row) are ignored — we do not invent a half-populated `types` row from the WTC source alone. Malformed WTC values (anything not in `{L, M, H, J}`) are dropped at parse time; the type row itself is preserved from Mictronics with `type_wtc = NULL`.
+
+**Affects:** `types` (sets `type_wtc`).
 
 ## Registration Conflict Resolution
 

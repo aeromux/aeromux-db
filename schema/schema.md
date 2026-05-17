@@ -13,6 +13,7 @@ Aircraft type lookup table.
 | `type_code` | TEXT (PK) | Aircraft type designator (e.g. `A320`, `B738`). |
 | `type_description` | TEXT | Human-readable type name (e.g. `Airbus A320`). |
 | `type_icao_class` | TEXT | ICAO aircraft classification code (e.g. `L2J`). |
+| `type_wtc` | TEXT | ICAO Wake Turbulence Category: `L` (Light) / `M` (Medium) / `H` (Heavy) / `J` (Super), or `NULL` if unknown. |
 
 ### `operators`
 
@@ -107,6 +108,7 @@ Consolidated view of all aircraft information. Joins `aircrafts`, `types`, `manu
 | `aircraft_type_code` | `aircrafts` | ICAO type designator. |
 | `type_description` | `types` | Human-readable type name. |
 | `type_icao_class` | `types` | ICAO aircraft classification code. |
+| `type_wtc` | `types` | ICAO Wake Turbulence Category (`L`/`M`/`H`/`J`). |
 | `aircraft_manufacturer_icao` | `aircrafts` | ICAO manufacturer code. |
 | `manufacturer_name` | `manufacturers` / `aircraft_fallbackdata` | Manufacturer name. Uses `manufacturers` table if reference exists, otherwise falls back to plain text from `aircraft_fallbackdata`. |
 | `aircraft_operator_icao` | `aircrafts` | ICAO operator code. |

@@ -17,7 +17,8 @@
 CREATE TABLE types (
     type_code TEXT PRIMARY KEY,
     type_description TEXT,
-    type_icao_class TEXT
+    type_icao_class TEXT,
+    type_wtc TEXT             -- 'L' | 'M' | 'H' | 'J' | NULL
 );
 
 CREATE TABLE operators (
@@ -68,6 +69,7 @@ SELECT
     a.aircraft_type_code,
     t.type_description,
     t.type_icao_class,
+    t.type_wtc,
     a.aircraft_manufacturer_icao,
     CASE WHEN a.aircraft_manufacturer_icao IS NOT NULL THEN m.manufacturer_name ELSE f.manufacturer END AS manufacturer_name,
     a.aircraft_operator_icao,

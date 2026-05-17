@@ -4,6 +4,14 @@ All notable changes to Aeromux Database Builder are documented in this file.
 
 This changelog covers the **builder tool** itself, not the generated database. Each weekly database release has its own record counts and details on the [Releases](https://github.com/aeromux/aeromux-db/releases) page.
 
+## [1.3.0] — 2026-05-17
+
+### Added
+
+- New data source: [tar1090-db (wiedehopf)](https://github.com/wiedehopf/tar1090-db) — per-type ICAO Wake Turbulence Category (WTC) values derived from DOC 8643.
+- New `type_wtc` column on the `types` table: `L` (Light), `M` (Medium), `H` (Heavy), `J` (Super), or `NULL` when unknown. Also surfaced in `aircraft_view`.
+- New `TYPES_WTC_COUNT` field in the build summary, showing how many of the imported types received a WTC value.
+
 ## [1.2.0] — 2026-04-26
 
 ### Added

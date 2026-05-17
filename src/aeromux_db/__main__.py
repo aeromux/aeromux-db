@@ -53,6 +53,11 @@ from aeromux_db.sources.planealertdb import (
     SOURCE_URL as PLANEALERTDB_SOURCE_URL,
     parse_aircraft as planealertdb_parse_aircraft,
 )
+from aeromux_db.sources.tar1090db import (
+    SOURCE_FILENAME as TAR1090DB_SOURCE_FILENAME,
+    SOURCE_URL as TAR1090DB_SOURCE_URL,
+    parse_wtc as tar1090db_parse_wtc,
+)
 from aeromux_db.sources.typelongnames import (
     SOURCE_FILENAME as TYPELONGNAMES_SOURCE_FILENAME,
     SOURCE_URL as TYPELONGNAMES_SOURCE_URL,
@@ -143,18 +148,18 @@ def main() -> None:
             temp_dir = Path(tmp)
 
             # Step 1: Download Mictronics
-            logger.info("Step 1/13: Downloading Mictronics database...")
+            logger.info("Step 1/16: Downloading Mictronics database...")
             result = download(SOURCE_URL, SOURCE_FILENAME, temp_dir, progress_callback=_make_progress_callback())
             _clear_progress_line()
             logger.info("  Downloaded %s", _format_file_size(result.size_bytes))
 
             # Step 2: Extract Mictronics
-            logger.info("Step 2/13: Extracting Mictronics archive...")
+            logger.info("Step 2/16: Extracting Mictronics archive...")
             extract = extract_zip(result.path)
             logger.info("  Extracted %d files", extract.file_count)
 
             # Step 3: Parse Mictronics
-            logger.info("Step 3/13: Parsing Mictronics data...")
+            logger.info("Step 3/16: Parsing Mictronics data...")
             logger.info("  Parsing types...")
             types = parse_types(extract.path)
             logger.info("  Parsed %s types", f"{len(types):,}")
@@ -166,13 +171,13 @@ def main() -> None:
             logger.info("  Parsed %s aircraft", f"{len(aircraft):,}")
 
             # Step 4: Download ADS-B Exchange
-            logger.info("Step 4/13: Downloading ADS-B Exchange database...")
+            logger.info("Step 4/16: Downloading ADS-B Exchange database...")
             adsbx_result = download(ADSBX_SOURCE_URL, ADSBX_SOURCE_FILENAME, temp_dir, progress_callback=_make_progress_callback())
             _clear_progress_line()
             logger.info("  Downloaded %s", _format_file_size(adsbx_result.size_bytes))
 
             # Step 5: Parse ADS-B Exchange
-            logger.info("Step 5/13: Parsing ADS-B Exchange data...")
+            logger.info("Step 5/16: Parsing ADS-B Exchange data...")
             logger.info("  Parsing aircraft...")
             adsbx_aircraft = adsbx_parse_aircraft(adsbx_result.path)
             logger.info("  Parsed %s aircraft", f"{len(adsbx_aircraft):,}")
@@ -184,7 +189,7 @@ def main() -> None:
             logger.info("  Parsed %s aircraft fallback records", f"{len(adsbx_fallback):,}")
 
             # Step 6: Download OpenSky Network
-            logger.info("Step 6/13: Downloading OpenSky Network database...")
+            logger.info("Step 6/16: Downloading OpenSky Network database...")
             logger.info("  Resolving latest filename...")
             listing_xml = fetch_text(OPENSKY_S3_LISTING_URL)
             opensky_filename = opensky_resolve_latest_filename(listing_xml)
@@ -195,7 +200,7 @@ def main() -> None:
             logger.info("  Downloaded %s", _format_file_size(opensky_result.size_bytes))
 
             # Step 7: Parse OpenSky Network
-            logger.info("Step 7/13: Parsing OpenSky Network data...")
+            logger.info("Step 7/16: Parsing OpenSky Network data...")
             logger.info("  Parsing manufacturers...")
             opensky_manufacturers = opensky_parse_manufacturers(opensky_result.path)
             logger.info("  Parsed %s manufacturers", f"{len(opensky_manufacturers):,}")
@@ -207,34 +212,50 @@ def main() -> None:
             logger.info("  Parsed %s aircraft enrichment records", f"{len(opensky_enrichment):,}")
 
             # Step 8: Download Plane Alert DB
-            logger.info("Step 8/13: Downloading Plane Alert DB...")
+            logger.info("Step 8/16: Downloading Plane Alert DB...")
             planealertdb_result = download(PLANEALERTDB_SOURCE_URL, PLANEALERTDB_SOURCE_FILENAME, temp_dir, progress_callback=_make_progress_callback())
             _clear_progress_line()
             logger.info("  Downloaded %s", _format_file_size(planealertdb_result.size_bytes))
 
             # Step 9: Parse Plane Alert DB
-            logger.info("Step 9/13: Parsing Plane Alert DB data...")
+            logger.info("Step 9/16: Parsing Plane Alert DB data...")
             planealertdb_aircraft = planealertdb_parse_aircraft(planealertdb_result.path)
             logger.info("  Parsed %s aircraft", f"{len(planealertdb_aircraft):,}")
 
             # Step 10: Download type-longnames
-            logger.info("Step 10/13: Downloading type-longnames database...")
+            logger.info("Step 10/16: Downloading type-longnames database...")
             typelongnames_result = download(TYPELONGNAMES_SOURCE_URL, TYPELONGNAMES_SOURCE_FILENAME, temp_dir, progress_callback=_make_progress_callback())
             _clear_progress_line()
             logger.info("  Downloaded %s", _format_file_size(typelongnames_result.size_bytes))
 
             # Step 11: Extract type-longnames
-            logger.info("Step 11/13: Extracting type-longnames archive...")
+            logger.info("Step 11/16: Extracting type-longnames archive...")
             typelongnames_extract = extract_tarball(typelongnames_result.path)
             logger.info("  Extracted %d files", typelongnames_extract.file_count)
 
             # Step 12: Parse type-longnames
-            logger.info("Step 12/13: Parsing type-longnames data...")
+            logger.info("Step 12/16: Parsing type-longnames data...")
             typelongnames_aircraft = typelongnames_parse_aircraft(typelongnames_extract.path)
             logger.info("  Parsed %s aircraft", f"{len(typelongnames_aircraft):,}")
 
-            # Step 13: Build database
-            logger.info("Step 13/13: Building database...")
+            # Step 13: Download tar1090-db
+            logger.info("Step 13/16: Downloading tar1090-db...")
+            tar1090db_result = download(TAR1090DB_SOURCE_URL, TAR1090DB_SOURCE_FILENAME, temp_dir, progress_callback=_make_progress_callback())
+            _clear_progress_line()
+            logger.info("  Downloaded %s", _format_file_size(tar1090db_result.size_bytes))
+
+            # Step 14: Extract tar1090-db
+            logger.info("Step 14/16: Extracting tar1090-db archive...")
+            tar1090db_extract = extract_tarball(tar1090db_result.path)
+            logger.info("  Extracted %d files", tar1090db_extract.file_count)
+
+            # Step 15: Parse tar1090-db WTC data
+            logger.info("Step 15/16: Parsing tar1090-db WTC data...")
+            wtc_map = tar1090db_parse_wtc(tar1090db_extract.path)
+            logger.info("  Parsed %s WTC entries", f"{len(wtc_map):,}")
+
+            # Step 16: Build database
+            logger.info("Step 16/16: Building database...")
             result = build_database(
                 aircraft,
                 types,
@@ -247,17 +268,20 @@ def main() -> None:
                 opensky_enrichment,
                 planealertdb_aircraft,
                 typelongnames_aircraft,
+                wtc_map,
                 db_version=db_version,
             )
 
             # Summary
             elapsed = time.monotonic() - start_time
+            types_wtc_count = sum(1 for t in types if t.type_wtc)
             logger.info("Build complete! (%.1fs)", elapsed)
             logger.debug(
-                "Output: %s | Aircraft: %s | Types: %s | Operators: %s",
+                "Output: %s | Aircraft: %s | Types: %s (WTC: %s) | Operators: %s",
                 result.path,
                 f"{result.total_aircraft:,}",
                 f"{len(types):,}",
+                f"{types_wtc_count:,}",
                 f"{len(operators):,}",
             )
 
@@ -267,6 +291,7 @@ def main() -> None:
             print(f"OUTPUT_FILE={result.path.relative_to(PROJECT_ROOT)}")
             print(f"AIRCRAFT_COUNT={result.total_aircraft:,}")
             print(f"TYPES_COUNT={len(types):,}")
+            print(f"TYPES_WTC_COUNT={types_wtc_count:,}")
             print(f"OPERATORS_COUNT={len(operators):,}")
             print(f"ADSBX_AIRCRAFT_COUNT={len(adsbx_aircraft):,}")
             print(f"ADSBX_DETAILS_COUNT={len(adsbx_details):,}")

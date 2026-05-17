@@ -9,7 +9,7 @@ Aeromux Database Builder generates a SQLite database from external aircraft data
 
 ## Features
 
-- **Multiple Data Sources** — Aggregates aircraft data from five external sources (Mictronics, ADS-B Exchange, OpenSky Network, Plane Alert DB, type-longnames) into a single, unified SQLite database.
+- **Multiple Data Sources** — Aggregates aircraft data from six external sources (Mictronics, ADS-B Exchange, OpenSky Network, Plane Alert DB, type-longnames, tar1090-db) into a single, unified SQLite database.
 
 - **Fast Local Lookups** — Provides Aeromux with aircraft metadata keyed by ICAO 24-bit address for instant enrichment of decoded messages.
 
@@ -70,7 +70,7 @@ The database contains the following tables:
 | Table | Description |
 |---|---|
 | `aircrafts` | One row per aircraft, keyed by ICAO 24-bit hex address. References `types` via type code. |
-| `types` | Aircraft type lookup — type code, description, and ICAO class (e.g., `L2J` for land-based, two-engine jet). |
+| `types` | Aircraft type lookup — type code, description, ICAO class (e.g., `L2J` for land-based, two-engine jet), and Wake Turbulence Category (`L`/`M`/`H`/`J`). |
 | `operators` | Operator lookup — ICAO airline designator, name, country, and callsign. |
 | `aircraft_details` | Extended aircraft information — year, manufacturer, model, owner/operator, FAA flags, and military flag. References `aircrafts` via ICAO address. |
 | `aircraft_fallbackdata` | Fallback plain-text manufacturer and operator names for aircraft without normalized references. |
@@ -98,6 +98,7 @@ The full SQL schema is defined in [`schema/schema.sql`](schema/schema.sql) and d
 | [OpenSky Network Aircraft Database](https://opensky-network.org/datasets/metadata/) | Manufacturer records, operator IATA codes, and aircraft enrichment data (country, serial number, owner). Distributed as a monthly CSV file. |
 | [Plane Alert DB](https://github.com/sdr-enthusiasts/plane-alert-db) | Community-maintained database of notable aircraft (military, government, VIP) with operator names, model descriptions, and military flags. Distributed as a CSV file, updated frequently. |
 | [Type-Longnames (wiedehopf/chrisglobe)](https://github.com/wiedehopf/type-longnames-chrisglobe) | Per-aircraft type descriptions (e.g. `Boeing C-40A Clipper`). Distributed as a tarball of CSV files, one per type code. |
+| [tar1090-db (wiedehopf)](https://github.com/wiedehopf/tar1090-db) | Per-type ICAO Wake Turbulence Category (`L`/`M`/`H`/`J`), derived from ICAO DOC 8643. Distributed as a tarball containing a single JSON file. |
 
 The tool downloads each data source, extracts and parses the data, and inserts the records into the database. Downloaded files are stored in a temporary directory that is automatically cleaned up after the build.
 
@@ -124,7 +125,8 @@ aeromux-db/
 │           ├── adsbexchange.py    # ADS-B Exchange data source parser
 │           ├── opensky.py         # OpenSky Network data source parser
 │           ├── planealertdb.py    # Plane Alert DB data source parser
-│           └── typelongnames.py   # Type-longnames data source parser
+│           ├── typelongnames.py   # Type-longnames data source parser
+│           └── tar1090db.py       # tar1090-db (WTC) data source parser
 ├── schema/
 │   ├── schema.sql         # Authoritative SQL schema (single source of truth)
 │   └── schema.md          # Human-readable schema documentation
@@ -169,6 +171,7 @@ This project would not be possible without the following data sources and their 
 - **[OpenSky Network](https://opensky-network.org/)** — Community-driven aircraft metadata including manufacturer records, operator IATA codes, and enrichment data. Thank you for maintaining this open dataset.
 - **[Plane Alert DB](https://github.com/sdr-enthusiasts/plane-alert-db)** — Community-maintained database of notable aircraft including military, government, and VIP planes. Thank you for curating and sharing this valuable resource with the aviation community.
 - **[Type-Longnames (wiedehopf/chrisglobe)](https://github.com/wiedehopf/type-longnames-chrisglobe)** — Per-aircraft type descriptions that provide specific model variants beyond generic type codes. Thank you for curating this detailed dataset.
+- **[tar1090-db (wiedehopf)](https://github.com/wiedehopf/tar1090-db)** — Per-type Wake Turbulence Category data derived from ICAO DOC 8643. Thank you for maintaining and freely sharing this mapping.
 
 ## Contact
 

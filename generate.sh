@@ -200,6 +200,7 @@ DB_VERSION=$(echo "$GENERATE_OUTPUT" | grep "^DB_VERSION=" | cut -d= -f2-)
 OUTPUT_FILE=$(echo "$GENERATE_OUTPUT" | grep "^OUTPUT_FILE=" | cut -d= -f2-)
 AIRCRAFT_COUNT=$(echo "$GENERATE_OUTPUT" | grep "^AIRCRAFT_COUNT=" | cut -d= -f2-)
 TYPES_COUNT=$(echo "$GENERATE_OUTPUT" | grep "^TYPES_COUNT=" | cut -d= -f2-)
+TYPES_WTC_COUNT=$(echo "$GENERATE_OUTPUT" | grep "^TYPES_WTC_COUNT=" | cut -d= -f2-)
 OPERATORS_COUNT=$(echo "$GENERATE_OUTPUT" | grep "^OPERATORS_COUNT=" | cut -d= -f2-)
 ADSBX_AIRCRAFT_COUNT=$(echo "$GENERATE_OUTPUT" | grep "^ADSBX_AIRCRAFT_COUNT=" | cut -d= -f2-)
 ADSBX_DETAILS_COUNT=$(echo "$GENERATE_OUTPUT" | grep "^ADSBX_DETAILS_COUNT=" | cut -d= -f2-)
@@ -223,6 +224,7 @@ log ""
 log "Records:"
 log "  - Aircraft: $AIRCRAFT_COUNT"
 log "  - Types: $TYPES_COUNT"
+log "  - Types with WTC: $TYPES_WTC_COUNT / $TYPES_COUNT"
 log "  - Operators: $OPERATORS_COUNT"
 log "  - Manufacturers: $OPENSKY_MANUFACTURERS_COUNT"
 log "  - Aircraft details: $ADSBX_DETAILS_COUNT"

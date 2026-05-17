@@ -24,6 +24,7 @@ class AircraftType:
     type_code: str
     type_description: str | None = None
     type_icao_class: str | None = None
+    type_wtc: str | None = None
 
 
 @dataclass
