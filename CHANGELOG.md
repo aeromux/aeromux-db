@@ -4,6 +4,20 @@ All notable changes to Aeromux Database Builder are documented in this file.
 
 This changelog covers the **builder tool** itself, not the generated database. Each weekly database release has its own record counts and details on the [Releases](https://github.com/aeromux/aeromux-db/releases) page.
 
+## [1.4.0] — 2026-06-27
+
+### Changed
+
+- The aircraft manufacturer is now derived from the (authoritative) aircraft type code instead of being taken from a per-aircraft source. The Mictronics type description names the manufacturer (`AIRBUS A-321`, `BOEING C-17 Globemaster 3`), so `aircraft_manufacturer_icao` is set from the type via a longest-prefix match against the `manufacturers` table. This keeps the manufacturer consistent with the type by construction (an A321 is always Airbus) and corrects stale manufacturers on reassigned ICAO hex addresses — e.g. hex `4D2145` (a Wizz Air A321) previously showed `Dassault` from OpenSky's record for the prior aircraft on that hex, and now shows `Airbus`. Types whose maker is not in the `manufacturers` table keep the per-aircraft value.
+
+### Fixed
+
+- Operator references pointing at an ICAO designator absent from the `operators` table (OpenSky-supplied) are no longer written to `aircrafts.aircraft_operator_icao`; the operator name is routed to `aircraft_fallbackdata.operator` instead. Previously these dangling references forced `aircraft_view.operator_name` to `NULL` and suppressed the available fallback name.
+- `aircraft_view.operator_name` now falls through to the fallback/owner tiers when the `operators` join misses, instead of keying off `aircraft_operator_icao IS NOT NULL`.
+- Registration conflict resolution: the majority-tiebreak priority map now ranks OpenSky above ADS-B Exchange, matching the documented default priority (`typelongnames > planealertdb > opensky > adsbx > mictronics`). Previously the two rule maps disagreed.
+- OpenSky `model` and `owner` enrichment now creates the `aircraft_details` row when absent (via `INSERT OR IGNORE`), matching Plane Alert DB and type-longnames; previously these updates were silently dropped for aircraft without an ADS-B Exchange details row.
+- OpenSky manufacturer names are now resolved deterministically (most frequent name per manufacturer key) instead of last-write-wins, and `manufacturer_icao` keys are case-folded to remove duplicate entries (e.g. `BOEING`/`Boeing`). Fixes arbitrary names such as `MCDONNELL DOUGLAS` → `Douglas` (now `Mcdonnell Douglas`). Manufacturer values that are wrong at the OpenSky source-majority level (e.g. Lisunov labelled `Douglas`) are unchanged.
+
 ## [1.3.0] — 2026-05-17
 
 ### Added

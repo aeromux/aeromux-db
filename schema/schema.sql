@@ -73,7 +73,7 @@ SELECT
     a.aircraft_manufacturer_icao,
     CASE WHEN a.aircraft_manufacturer_icao IS NOT NULL THEN m.manufacturer_name ELSE f.manufacturer END AS manufacturer_name,
     a.aircraft_operator_icao,
-    CASE WHEN a.aircraft_operator_icao IS NOT NULL THEN o.operator_name WHEN f.operator IS NOT NULL THEN f.operator ELSE d.owner_operator END AS operator_name,
+    CASE WHEN o.operator_name IS NOT NULL THEN o.operator_name WHEN f.operator IS NOT NULL THEN f.operator ELSE d.owner_operator END AS operator_name,
     o.operator_iata,
     o.operator_country,
     o.operator_callsign,

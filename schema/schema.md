@@ -112,7 +112,7 @@ Consolidated view of all aircraft information. Joins `aircrafts`, `types`, `manu
 | `aircraft_manufacturer_icao` | `aircrafts` | ICAO manufacturer code. |
 | `manufacturer_name` | `manufacturers` / `aircraft_fallbackdata` | Manufacturer name. Uses `manufacturers` table if reference exists, otherwise falls back to plain text from `aircraft_fallbackdata`. |
 | `aircraft_operator_icao` | `aircrafts` | ICAO operator code. |
-| `operator_name` | `operators` / `aircraft_fallbackdata` / `aircraft_details` | Operator name. Uses `operators` table if reference exists, then falls back to plain text from `aircraft_fallbackdata`, then to `owner_operator` from `aircraft_details`. |
+| `operator_name` | `operators` / `aircraft_fallbackdata` / `aircraft_details` | Operator name. Uses the `operators` table when the join resolves, then falls back to plain text from `aircraft_fallbackdata`, then to `owner_operator` from `aircraft_details`. |
 | `operator_iata` | `operators` | IATA operator code. |
 | `operator_country` | `operators` | Country of the operator. |
 | `operator_callsign` | `operators` | Radio callsign. |

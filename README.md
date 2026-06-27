@@ -72,7 +72,7 @@ The database contains the following tables:
 | `aircrafts` | One row per aircraft, keyed by ICAO 24-bit hex address. References `types` via type code. |
 | `types` | Aircraft type lookup — type code, description, ICAO class (e.g., `L2J` for land-based, two-engine jet), and Wake Turbulence Category (`L`/`M`/`H`/`J`). |
 | `operators` | Operator lookup — ICAO airline designator, name, country, and callsign. |
-| `aircraft_details` | Extended aircraft information — year, manufacturer, model, owner/operator, FAA flags, and military flag. References `aircrafts` via ICAO address. |
+| `aircraft_details` | Extended aircraft information — year, model, owner/operator, FAA flags, and military flag. References `aircrafts` via ICAO address. |
 | `aircraft_fallbackdata` | Fallback plain-text manufacturer and operator names for aircraft without normalized references. |
 | `manufacturers` | Manufacturer lookup — ICAO code and name. |
 | `metadata` | Build metadata as key-value pairs. |

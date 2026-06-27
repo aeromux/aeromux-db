@@ -16,6 +16,7 @@
 
 import csv
 import logging
+import os
 import re
 import sqlite3
 from collections import Counter
@@ -85,7 +86,7 @@ def _resolve_registration(
     counts = Counter(v for v, _ in candidates)
     majority = [v for v, c in counts.items() if c >= 2]
     if majority:
-        priority = {"typelongnames": 5, "planealertdb": 4, "adsbx": 3, "opensky": 2, "mictronics": 1}
+        priority = {"typelongnames": 5, "planealertdb": 4, "opensky": 3, "adsbx": 2, "mictronics": 1}
         winner_val = max(
             majority,
             key=lambda v: max(priority[s] for val, s in candidates if val == v),
@@ -116,6 +117,32 @@ def _resolve_registration(
     default = {"typelongnames": 5, "planealertdb": 4, "opensky": 3, "adsbx": 2, "mictronics": 1}
     winner = max(candidates, key=lambda c: default[c[1]])
     return winner[0], winner[1], "default_priority"
+
+
+def _build_type_manufacturer_map(
+    types: list[AircraftType], manufacturer_icaos: list[str]
+) -> dict[str, str]:
+    """Map each type code to a manufacturer ICAO derived from its description.
+
+    The Mictronics type description names the manufacturer as a leading token
+    (e.g. ``AIRBUS A-321`` -> ``AIRBUS``), so the manufacturer can be derived
+    from the authoritative type code rather than taken from a per-aircraft
+    source that may carry a stale aircraft (a reassigned ICAO hex). The longest
+    manufacturer key that is a whole-word prefix of the description wins, so
+    ``AIRBUS HELICOPTERS`` beats ``AIRBUS``. Type codes whose description matches
+    no known manufacturer are omitted (the per-aircraft manufacturer is kept).
+    """
+    keys = sorted(manufacturer_icaos, key=len, reverse=True)
+    mapping: dict[str, str] = {}
+    for t in types:
+        if not t.type_description:
+            continue
+        desc = t.type_description.upper()
+        for k in keys:
+            if desc == k or desc.startswith(k + " "):
+                mapping[t.type_code] = k
+                break
+    return mapping
 
 
 def build_database(
@@ -355,6 +382,9 @@ def build_database(
                 row[0]: row[1]
                 for row in conn.execute("SELECT aircraft_icao_address, aircraft_registration FROM aircrafts")
             }
+            operator_icaos = {
+                row[0] for row in conn.execute("SELECT operator_icao FROM operators")
+            }
 
             enriched = 0
             seen: set[str] = set()
@@ -395,8 +425,12 @@ def build_database(
                             (oa.registration, oa.icao24),
                         )
 
-                # Operator: reference or fallback
-                if oa.operator_icao:
+                # Operator: reference only when the ICAO is a known operator,
+                # otherwise keep the plain-text name as fallback. Writing an
+                # operator_icao that is absent from the operators table would
+                # produce a dangling reference and suppress the fallback name in
+                # aircraft_view.
+                if oa.operator_icao and oa.operator_icao in operator_icaos:
                     conn.execute(
                         "UPDATE aircrafts SET aircraft_operator_icao = ? "
                         "WHERE aircraft_icao_address = ?",
@@ -408,6 +442,14 @@ def build_database(
                         "VALUES (?, ?) "
                         "ON CONFLICT(aircraft_icao_address) DO UPDATE SET operator = ?",
                         (oa.icao24, oa.operator, oa.operator),
+                    )
+
+                # Ensure a details row exists so owner/model enrichment is not
+                # silently dropped for aircraft without an ADS-B Exchange details row.
+                if oa.owner or oa.model:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO aircraft_details (aircraft_icao_address) VALUES (?)",
+                        (oa.icao24,),
                     )
 
                 # Owner enrichment
@@ -669,8 +711,27 @@ def build_database(
             logger.info("    Type-longnames: %s", f"{typelongnames_mismatch_count:,}")
             logger.info(
                 "    Wrote to %s",
-                mismatch_path.relative_to(PROJECT_ROOT),
+                os.path.relpath(mismatch_path, PROJECT_ROOT),
             )
+
+        # Derive each aircraft's manufacturer from its (authoritative) type code.
+        # The type description names the manufacturer, so this keeps the
+        # manufacturer consistent with the type (an A321 is always Airbus) and
+        # corrects stale per-aircraft manufacturers — e.g. a reassigned ICAO hex
+        # whose OpenSky record still carries the previous aircraft's maker.
+        # Types whose description matches no known manufacturer keep whatever the
+        # per-aircraft sources provided.
+        type_mfr = _build_type_manufacturer_map(types, [m.manufacturer_icao for m in (manufacturers or [])])
+        if type_mfr:
+            conn.execute("CREATE TEMP TABLE _type_mfr (type_code TEXT PRIMARY KEY, manufacturer_icao TEXT)")
+            conn.executemany("INSERT INTO _type_mfr VALUES (?, ?)", list(type_mfr.items()))
+            cursor = conn.execute(
+                "UPDATE aircrafts SET aircraft_manufacturer_icao = "
+                "(SELECT manufacturer_icao FROM _type_mfr WHERE type_code = aircrafts.aircraft_type_code) "
+                "WHERE aircraft_type_code IN (SELECT type_code FROM _type_mfr)"
+            )
+            conn.execute("DROP TABLE _type_mfr")
+            logger.info("  Manufacturer derived from type for %s aircraft", f"{cursor.rowcount:,}")
 
         logger.debug("Writing metadata")
         build_timestamp = datetime.now(timezone.utc).isoformat()

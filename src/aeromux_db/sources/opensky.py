@@ -18,6 +18,7 @@ import csv
 import logging
 import re
 import sys
+from collections import Counter
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -40,6 +41,17 @@ def _to_str(value: str | None) -> str | None:
         return None
     value = value.strip()
     return value or None
+
+
+def _pick_name(counter: "Counter[str]") -> str | None:
+    """Pick the most frequent name; tie-break by longest, then lexicographic.
+
+    Deterministic replacement for last-write-wins so the same input always
+    yields the same manufacturer name.
+    """
+    if not counter:
+        return None
+    return min(counter, key=lambda name: (-counter[name], -len(name), name))
 
 
 def resolve_latest_filename(listing_xml: str) -> str:
@@ -79,30 +91,37 @@ def resolve_latest_filename(listing_xml: str) -> str:
 def parse_manufacturers(file_path: Path) -> list[Manufacturer]:
     """Parse CSV and extract unique manufacturers with ICAO codes.
 
+    Manufacturer ICAO keys are case-folded to uppercase so case-variant
+    duplicates (e.g. ``BOEING`` and ``Boeing``) collapse into a single record.
+    The display name is chosen deterministically as the most frequent non-empty
+    ``manufacturerName`` seen for that key, rather than last-write-wins (which
+    produced arbitrary names such as ``MCDONNELL DOUGLAS`` -> ``Douglas``).
+
     Args:
         file_path: Path to the OpenSky CSV file.
 
     Returns:
         List of unique manufacturer records.
     """
-    manufacturers: dict[str, Manufacturer] = {}
+    name_counts: dict[str, "Counter[str]"] = {}
     with open(file_path, "r", encoding="utf-8") as f:
         reader = csv.DictReader(f, quotechar="'")
         for row in reader:
             icao = _to_str(row.get("manufacturerIcao"))
             if icao is None:
                 continue
+            icao = icao.upper()
+            counter = name_counts.setdefault(icao, Counter())
             name = _to_str(row.get("manufacturerName"))
-            if icao in manufacturers:
-                if name and manufacturers[icao].manufacturer_name != name:
-                    manufacturers[icao].manufacturer_name = name
-            else:
-                manufacturers[icao] = Manufacturer(
-                    manufacturer_icao=icao,
-                    manufacturer_name=name,
-                )
+            if name:
+                counter[name] += 1
+
+    manufacturers = [
+        Manufacturer(manufacturer_icao=icao, manufacturer_name=_pick_name(counter))
+        for icao, counter in name_counts.items()
+    ]
     logger.debug("Parsed %d manufacturers from OpenSky", len(manufacturers))
-    return list(manufacturers.values())
+    return manufacturers
 
 
 def parse_operator_iata(file_path: Path) -> dict[str, str]:
@@ -155,7 +174,8 @@ def parse_aircraft_enrichment(file_path: Path) -> list[OpenSkyAircraftData]:
                     country=_to_str(row.get("country")),
                     serial_number=_to_str(row.get("serialNumber")),
                     model=model,
-                    manufacturer_icao=_to_str(row.get("manufacturerIcao")),
+                    # Case-fold to match the upper-cased manufacturers table key
+                    manufacturer_icao=(mi.upper() if (mi := _to_str(row.get("manufacturerIcao"))) else None),
                     manufacturer_name=_to_str(row.get("manufacturerName")),
                     operator_icao=_to_str(row.get("operatorIcao")),
                     operator=_to_str(row.get("operator")),
